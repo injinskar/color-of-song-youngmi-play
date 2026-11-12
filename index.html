@@ -1469,17 +1469,33 @@ button.primary{background:var(--grain),linear-gradient(180deg,#ffffff 0%,#e6e4dd
     soundBtn.addEventListener("click", () => {
       player && (player.unMute(), player.setVolume(volume()), player.playVideo(), soundBtn.hidden = !0);
     });
+    let ccOffFor = null, ccOffAt = 0;
+    function noCaptions(p) {
+      try {
+        let id = p.getVideoData?.().video_id;
+        if (!id) return;
+        if (id !== ccOffFor)
+          ccOffFor = id, ccOffAt = Date.now();
+        else if (Date.now() - ccOffAt > 6e3) return;
+        p.setOption?.("captions", "track", {}), p.unloadModule?.("captions");
+      } catch {
+      }
+    }
     function create(tv2, roomId) {
       ownerId = roomId, failed = !1, loadApi().then((YT) => {
         ownerId === roomId && (player = new YT.Player("tvPlayer", {
           width: "100%",
           height: "100%",
-          playerVars: { listType: "playlist", list: tv2.list, autoplay: 1, controls: 1, rel: 0, playsinline: 1, modestbranding: 1, loop: 1, iv_load_policy: 3 },
+          playerVars: { listType: "playlist", list: tv2.list, autoplay: 1, controls: 1, rel: 0, playsinline: 1, modestbranding: 1, loop: 1, iv_load_policy: 3, cc_load_policy: 0 },
           events: {
             onReady: (e) => {
               ready2 = !0, e.target.setVolume(volume()), tryShuffle(), e.target.playVideo(), checkSound();
             },
-            onStateChange: () => tryShuffle(),
+            onStateChange: (e) => {
+              tryShuffle(), e.data === 1 && noCaptions(e.target);
+            },
+            onApiChange: (e) => noCaptions(e.target),
+            // 자막 모듈이 뜰 때마다 끈다 (영상 쪽 설정으로 자막이 기본으로 켜지는 경우)
             onError: () => {
               failed = !0, el.classList.remove("show");
             }
